@@ -1,0 +1,6 @@
+version: '3'
+services:
+  server:
+    container_name: server
+    image: server:latest
+    entrypoint: /server
