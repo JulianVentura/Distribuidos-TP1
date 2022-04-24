@@ -1,0 +1,6 @@
+.dockerignore
+**/config*
+**/Dockerfile
+**/docker-compose-dev.yaml
+README.md
+Makefile

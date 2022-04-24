@@ -1,0 +1,18 @@
+address:
+  ip: "server"
+  port: "12345"
+client:
+  timeout: 5s
+workers:
+  database:
+    writers: 1
+    readers: 1
+    mergers: 1
+  connection: 1
+queues:
+  database:
+    readers: 8
+    writers: 8
+    mergers: 8
+  connection: 4
+  dispatcher: 20

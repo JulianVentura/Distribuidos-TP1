@@ -4,3 +4,34 @@ services:
     container_name: server
     image: server:latest
     entrypoint: /server
+    volumes:
+      - type: bind 
+        source: ./server/config.yaml
+        target: /config.yaml
+    networks:
+      - tp1_net
+
+  client_app:
+    container_name: client_app
+    image: client_app:latest
+    entrypoint: /client_app
+    volumes:
+      - type: bind 
+        source: ./client_app/config.yaml
+        target: /config.yaml
+    # environment:
+    #   - CLI_ID=1
+    #   - CLI_SERVER_ADDRESS=server:12345
+    #   - CLI_LOOP_LAPSE=1m15s
+    #   - CLI_LOG_LEVEL=DEBUG
+    networks:
+      - tp1_net
+    depends_on:
+      - server
+
+networks:
+  tp1_net:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.25.125.0/24

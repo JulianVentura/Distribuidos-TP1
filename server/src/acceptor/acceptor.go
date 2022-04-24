@@ -24,7 +24,7 @@ func Start(config AcceptorConfig, dispatcher chan messages.DispatcherMessage) (*
 	if err != nil {
 		return nil, Err.Ctx("Couldn't create server", err)
 	}
-	f_channel := make(chan bool, 1)
+	f_channel := make(chan bool, 2)
 
 	acc := &Acceptor{
 		skt:          skt,
@@ -50,11 +50,13 @@ func (self *Acceptor) run() {
 		if err != nil {
 			if self.finish == true {
 				fmt.Println("Acceptor Worker has been closed")
-				self.has_finished <- true
+				break
 			}
 			panic("Accept has failed") // TODO: Ver como informar de un error fatal al servidor, para su finalizacion
 		}
 
 		self.dispatcher <- messages.NewConnection{Skt: &conn}
 	}
+	_ = self.skt.Close()
+	self.has_finished <- true
 }

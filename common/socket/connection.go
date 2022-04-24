@@ -3,6 +3,7 @@ package socket
 import (
 	Err "distribuidos/tp1/common/errors"
 	"net"
+	"time"
 )
 
 type TCPConnection struct {
@@ -36,6 +37,16 @@ func (self *TCPConnection) Send(message []byte) error {
 	}
 
 	return nil
+}
+
+func (self *TCPConnection) Receive_with_timeout(message []byte, t time.Duration) error {
+	//We set the deadline t (duration) from now
+	self.skt.SetReadDeadline(time.Now().Add(t))
+	err := self.Receive(message)
+	//Since the deadline keeps active, we have to disable it so it won't affect other calls
+	self.skt.SetReadDeadline(time.Time{})
+
+	return err
 }
 
 func (self *TCPConnection) Receive(message []byte) error {

@@ -8,12 +8,14 @@ import (
 	"distribuidos/tp1/server/src/dispatcher"
 	"distribuidos/tp1/server/src/messages"
 	"fmt"
+	"time"
 )
 
 type ServerConfig struct {
 	//Connection
-	Host string
-	Port string
+	Server_ip           string
+	Server_port         string
+	Client_conn_timeout time.Duration
 	//Number of workers
 	Con_worker_number uint
 	DB_writers_number uint
@@ -36,7 +38,10 @@ type ServerQueues struct {
 }
 
 type Server struct {
-	acceptor *acceptor.Acceptor
+	acceptor     *acceptor.Acceptor
+	dispatcher   *dispatcher.Dispatcher
+	conn_workers []*connection.ConnectionWorker
+	database     *database.Database
 }
 
 // TODO: Realizar limpieza en caso de error y modularizar
@@ -67,13 +72,27 @@ func Start(config ServerConfig) (*Server, error) {
 	if err != nil {
 		return nil, Err.Ctx("Error starting Acceptor", err)
 	}
-	// acceptor := acceptor.Start(host, port)
 	fmt.Println(conn_workers, db, dispatcher, acceptor)
 
 	server := &Server{
-		acceptor: nil,
+		acceptor:     acceptor,
+		conn_workers: conn_workers,
+		dispatcher:   dispatcher,
+		database:     db,
 	}
 	return server, nil
+}
+
+func (self *Server) Finish() {
+	//Cerrar al aceptador
+	self.acceptor.Finish()
+	//Cerrar las conexiones
+	for _, conn := range self.conn_workers {
+		conn.Finish()
+	}
+	//Cerrar la base de datos
+	//Cerrar el dispatcher
+	self.dispatcher.Finish()
 }
 
 func start_queues(config *ServerConfig) ServerQueues {
@@ -101,11 +120,10 @@ func start_database(config *ServerConfig, queues *ServerQueues) (*database.Datab
 }
 
 func start_connection_workers(config *ServerConfig, queues *ServerQueues) ([]*connection.ConnectionWorker, error) {
-	//TODO: Check this
 	connections := make([]*connection.ConnectionWorker, config.Con_worker_number)
 	w_config := connection.ConnectionWorkerConfig{
-		Queue_size: 8,
-		Id:         0,
+		Id:                 0,
+		Connection_timeout: config.Client_conn_timeout,
 	}
 	for i := uint(0); i < config.Con_worker_number; i++ {
 		w_config.Id = i
@@ -124,16 +142,14 @@ func start_connection_workers(config *ServerConfig, queues *ServerQueues) ([]*co
 func start_dispatcher(config *ServerConfig, queues *ServerQueues) (*dispatcher.Dispatcher, error) {
 
 	//TODO: Check this
-	d_config := dispatcher.DispatcherConfig{
-		Queue_size: 4,
-	}
+	d_config := dispatcher.DispatcherConfig{}
 	return dispatcher.Start(d_config, queues.Dispatcher_queue, queues.Con_worker_queue)
 }
 
 func start_acceptor(config *ServerConfig, queues *ServerQueues) (*acceptor.Acceptor, error) {
 	acceptor_config := acceptor.AcceptorConfig{
-		Host: config.Host,
-		Port: config.Port,
+		Host: config.Server_ip,
+		Port: config.Server_port,
 	}
 	return acceptor.Start(acceptor_config, queues.Dispatcher_queue)
 }

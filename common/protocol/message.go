@@ -9,8 +9,12 @@ type Encodable interface {
 }
 
 const (
-	MetricOP uint8 = 0
-	QueryOP        = 1
+	MetricOP        uint8 = 0
+	QueryOP               = 1
+	QueryResponseOP       = 2
+	ErrorOP               = 3
+	FinishOP              = 4
+	OkOP                  = 5
 )
 
 type AggregationCommand uint8
@@ -23,79 +27,171 @@ const (
 )
 
 type Metric struct { //Implements Encodable
-	id    string
-	value float64
+	Id    string
+	Value float64
 }
 
 type Query struct { //Implements Encodable
-	metric_id             string
-	from                  string //Datetime
-	to                    string //Datetime
-	aggregation           AggregationCommand
-	aggregationWindowSecs float64
+	Metric_id             string
+	From                  string //Datetime
+	To                    string //Datetime
+	Aggregation           string
+	AggregationWindowSecs float64
 }
 
-func NewMetric(id string, value float64) *Metric {
-	return &Metric{
-		id:    id,
-		value: value,
+type Error struct { //Implements Encodable
+	Message string
+}
+
+type Finish struct { //Implements Encodable
+}
+
+type Ok struct { //Implements Encodable
+}
+
+func encodeAggregation(agg string) []byte {
+	var code AggregationCommand
+	switch agg {
+	case "AVG":
+		code = AVG
+	case "MIN":
+		code = MIN
+	case "MAX":
+		code = MAX
+	case "COUNT":
+		code = COUNT
+	default:
+		//We should return an error instead
+		//This is done on purpose to force server to check corruption on aggregation command
+		//The optimal solution would check for errors on both client and server sides
+		code = AggregationCommand(255)
 	}
+
+	return encode8(uint8(code))
 }
 
+func decodeAggregation(bytes []byte) (string, uint32, error) {
+	var agg string
+	_code, n := decode8(bytes)
+	code := AggregationCommand(_code)
+
+	switch code {
+	case AVG:
+		agg = "AVG"
+	case MIN:
+		agg = "MIN"
+	case MAX:
+		agg = "MAX"
+	case COUNT:
+		agg = "COUNT"
+	default:
+		//Now we will return an error
+		return "", 0, fmt.Errorf("Error decoding aggregation function of Query message on Protocol, code %v not recognized", code)
+	}
+
+	return agg, n, nil
+}
 func (self *Query) encode() []byte {
-	message_id := Encode8(QueryOP)
-	metric_id := EncodeString(self.metric_id)
-	from := EncodeString(self.from)
-	to := EncodeString(self.to)
-	aggregation := Encode8(uint8(self.aggregation))
-	agg_window := Encode64(uint64(self.aggregationWindowSecs))
+	message_id := encode8(QueryOP)
+	metric_id := encodeString(self.Metric_id)
+	from := encodeString(self.From)
+	to := encodeString(self.To)
+	aggregation := encodeAggregation(self.Aggregation)
+	agg_window := encodeF64(self.AggregationWindowSecs)
 
 	return append_slices([][]byte{message_id, metric_id, from, to, aggregation, agg_window})
 }
 
 //TODO: Que pasa si la data llega corrupta? Panic?
 func (self *Query) fromEncoding(code []byte) error {
-	start := uint32(1) //MetricID encoding
+	_, start := decode8(code)
 
-	metric_id, str_len := DecodeString(code[start:])
-	start += str_len
+	metric_id, n := decodeString(code[start:])
+	start += n
 
-	from, str_len := DecodeString(code[start:])
-	start += str_len
+	from, n := decodeString(code[start:])
+	start += n
 
-	to, str_len := DecodeString(code[start:])
-	start += str_len
+	to, n := decodeString(code[start:])
+	start += n
 
-	self.aggregation = AggregationCommand(Decode8(code[start:]))
-	start += 1
+	aggregation, n, err := decodeAggregation(code[start:])
+	if err != nil {
+		return err
+	}
+	start += n
 
-	self.aggregationWindowSecs = float64(Decode64(code[start:]))
-	self.metric_id = metric_id
-	self.from = from
-	self.to = to
+	agg_window, n := decodeF64(code[start:])
+	start += n
+
+	self.Metric_id = metric_id
+	self.From = from
+	self.To = to
+	self.Aggregation = aggregation
+	self.AggregationWindowSecs = agg_window
 
 	return nil
 }
 
 //TODO: Improve performance
 func (self *Metric) encode() []byte {
-	message_id := Encode8(MetricOP)
-	metric_id := EncodeString(self.id)
-	value := Encode64(uint64(self.value))
+	message_id := encode8(MetricOP)
+	metric_id := encodeString(self.Id)
+	value := encodeF64(self.Value)
 
 	return append_slices([][]byte{message_id, metric_id, value})
 }
 
 func (self *Metric) fromEncoding(code []byte) error {
-	start := uint32(1) //MetricID encoding
-	id, str_len := DecodeString(code[start:])
-	start += str_len
-	self.id = id
-	self.value = float64(Decode64(code[start:]))
+
+	_, start := decode8(code)
+
+	id, n := decodeString(code[start:])
+	start += n
+
+	value, n := decodeF64(code[start:])
+	start += n
+
+	self.Id = id
+	self.Value = value
 
 	return nil
 }
 
+func (self *Error) encode() []byte {
+	message_id := encode8(ErrorOP)
+	message := encodeString(self.Message)
+	return append(message_id, message...)
+}
+
+func (self *Error) fromEncoding(code []byte) error {
+
+	_, start := decode8(code)
+
+	message, _ := decodeString(code[start:])
+
+	self.Message = message
+
+	return nil
+}
+
+func (self *Finish) encode() []byte {
+	return encode8(FinishOP)
+}
+
+func (self *Finish) fromEncoding(code []byte) error {
+	return nil
+}
+
+func (self *Ok) encode() []byte {
+	return encode8(OkOP)
+}
+
+func (self *Ok) fromEncoding(code []byte) error {
+	return nil
+}
+
+//TODO: Change to private
 func Encode(message Encodable) []byte {
 	return message.encode()
 }
@@ -103,12 +199,22 @@ func Encode(message Encodable) []byte {
 func Decode(code []byte) (Encodable, error) {
 	var err error
 	var msg Encodable
-	message_id := uint8(Decode8(code))
+
+	id, _ := decode8(code)
+	message_id := uint8(id)
+
 	switch message_id {
+
 	case MetricOP:
 		msg = &Metric{}
 	case QueryOP:
 		msg = &Query{}
+	case ErrorOP:
+		msg = &Error{}
+	case FinishOP:
+		msg = &Finish{}
+	case OkOP:
+		msg = &Ok{}
 	default:
 		return nil, fmt.Errorf("Error al decodificar el mensaje\n")
 	}
