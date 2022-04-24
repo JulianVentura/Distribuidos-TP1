@@ -1,0 +1,20 @@
+version: '3'
+services:
+  server:
+    container_name: server
+    image: server:latest
+    entrypoint: /server
+    volumes:
+      - type: bind 
+        source: ./server/config.yaml
+        target: /config.yaml
+    networks:
+      - tp1_net
+
+networks:
+  tp1_net:
+    name: "tp1_net"
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.25.125.0/24

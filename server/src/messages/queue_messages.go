@@ -34,9 +34,9 @@ type QueryResponse struct {
 	Response       string //Change
 }
 
-type NewEvent struct {
+type NewMetric struct {
 	Conn_worker_id uint
-	Event          models.Event
+	Metric         models.Metric
 }
 
 type NewQuery struct {
@@ -52,5 +52,5 @@ func (ConnectionFinished) implementsDispatcherMessage() {}
 func (QueryResponse) implementsDispatcherMessage()       {}
 func (QueryResponse) implementsConnectionWorkerMessage() {}
 
-func (NewEvent) implementsWriteDatabaseMessage() {}
-func (NewEvent) implementsReadDatabaseMessage()  {}
+func (NewMetric) implementsWriteDatabaseMessage() {}
+func (NewMetric) implementsReadDatabaseMessage()  {}

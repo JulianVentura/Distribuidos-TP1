@@ -25,15 +25,36 @@ docker-image:
 	# docker rmi `docker images --filter label=intermediateStageToBeDeleted=true -q`
 .PHONY: docker-image
 
-docker-compose-up: docker-image
-	docker-compose -f docker-compose-dev.yaml up --build
-.PHONY: docker-compose-up
+docker-server-image:
+	docker build -f ./server/Dockerfile -t "server:latest" .
+.PHONY: docker-server-image
 
-docker-compose-down:
-	docker-compose -f docker-compose-dev.yaml stop -t 10
-	docker-compose -f docker-compose-dev.yaml down
-.PHONY: docker-compose-down
+docker-client-app-image:
+	docker build -f ./client_app/Dockerfile -t "client_app:latest" .
+.PHONY: docker-server-image
 
-docker-compose-logs:
-	docker-compose -f docker-compose-dev.yaml logs -f
-.PHONY: docker-compose-logs
+server-up: docker-server-image
+	docker-compose -f docker-compose-server.yaml up --build
+.PHONY: server-up
+
+client-app-up: docker-client-app-image
+	docker-compose -f docker-compose-clients.yaml up --build
+.PHONY: server-up
+
+server-down:
+	docker-compose -f docker-compose-server.yaml stop -t 10
+	docker-compose -f docker-compose-server.yaml down
+.PHONY: server-down
+
+client-app-down:
+	docker-compose -f docker-compose-clients.yaml stop -t 10
+	docker-compose -f docker-compose-clients.yaml down
+.PHONY: client-app-down
+
+server-logs:
+	docker-compose -f docker-compose-server.yaml logs -f
+.PHONY: server-logs
+
+client-app-logs:
+	docker-compose -f docker-compose-clients.yaml logs -f
+.PHONY: client-app-logs

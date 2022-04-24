@@ -44,11 +44,6 @@ func InitConfig() (*viper.Viper, error) {
 		fmt.Println("Configuration could not be read from config file. Using env variables instead")
 	}
 
-	// Parse time.Duration variables and return an error if those variables cannot be parsed
-	if _, err := time.ParseDuration(v.GetString("loop.lapse")); err != nil {
-		return nil, Err.Ctx("Could not parse CLI_LOOP_LAPSE env var as time.Duration.", err)
-	}
-
 	if _, err := time.ParseDuration(v.GetString("loop.period")); err != nil {
 		return nil, Err.Ctx("Could not parse CLI_LOOP_PERIOD env var as time.Duration.", err)
 	}
@@ -65,9 +60,10 @@ func main() {
 	}
 
 	c_config := client.ClientConfig{
-		Id:             0,
-		Server_address: config.GetString("server.address"),
-		Loop_period:    config.GetDuration("loop.period"),
+		Id:              config.GetUint("id"),
+		Server_address:  config.GetString("server.address"),
+		Loop_period:     config.GetDuration("loop.period"),
+		Number_of_loops: config.GetUint("loop.number"),
 	}
 
 	cli, err := client.Start(c_config)

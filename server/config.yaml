@@ -8,7 +8,7 @@ workers:
     writers: 1
     readers: 1
     mergers: 1
-  connection: 1
+  connection: 2
 queues:
   database:
     readers: 8

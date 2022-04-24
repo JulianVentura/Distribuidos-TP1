@@ -44,6 +44,7 @@ type Error struct { //Implements Encodable
 }
 
 type Finish struct { //Implements Encodable
+	Message string
 }
 
 type Ok struct { //Implements Encodable
@@ -176,10 +177,18 @@ func (self *Error) fromEncoding(code []byte) error {
 }
 
 func (self *Finish) encode() []byte {
-	return encode8(FinishOP)
+	message_id := encode8(FinishOP)
+	message := encodeString(self.Message)
+	return append(message_id, message...)
 }
 
 func (self *Finish) fromEncoding(code []byte) error {
+	_, start := decode8(code)
+
+	message, _ := decodeString(code[start:])
+
+	self.Message = message
+
 	return nil
 }
 

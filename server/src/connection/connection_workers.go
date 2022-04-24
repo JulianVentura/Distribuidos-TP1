@@ -4,6 +4,7 @@ import (
 	"distribuidos/tp1/common/protocol"
 	"distribuidos/tp1/common/socket"
 	"distribuidos/tp1/server/src/messages"
+	"distribuidos/tp1/server/src/models"
 	"fmt"
 	"time"
 )
@@ -100,26 +101,36 @@ Loop:
 	}
 
 	_ = client.Close()
-	//Acá probablemente tendríamos que enviar el mensaje de conexion finalizada al Dispatcher
+	self.dispatcher <- messages.ConnectionFinished{
+		Conn_worker_id: self.id,
+	}
 }
 
-func (self *ConnectionWorker) handle_new_metric(metric *protocol.Metric, client *socket.TCPConnection) {
-	fmt.Printf(" - Metric: (%v, %v)\n", metric.Id, metric.Value)
+func (self *ConnectionWorker) handle_new_metric(m *protocol.Metric, client *socket.TCPConnection) {
 	//Instanciar métrica a nivel business
+	metric, err := models.NewMetric(m.Id, m.Value)
+	if err != nil {
+		send_error(client, "Bad formating")
+		return
+	}
 	//Encolar en la cola de writers de bdd
+	fmt.Printf(" - Metric: (%v, %v)\n", metric.Id, metric.Value)
 	//Enviar mensaje OK al cliente
 	send_ok(client)
-	//retornar
 }
 
-func (self *ConnectionWorker) handle_query(query *protocol.Query, client *socket.TCPConnection) {
-	fmt.Printf(" - Query: (%v, %v, %v, %v, %v)\n", query.Metric_id, query.From, query.To, query.Aggregation, query.AggregationWindowSecs)
+func (self *ConnectionWorker) handle_query(q *protocol.Query, client *socket.TCPConnection) {
 	//Instanciar query a nivel business
+	query, err := models.NewQuery(q.Metric_id, q.From, q.To, q.Aggregation, q.AggregationWindowSecs)
+	if err != nil {
+		send_error(client, "Bad formating")
+		return
+	}
 	//Encolar en la cola de readers de bdd
+	fmt.Printf(" - Query: (%v, %v, %v, %v, %v)\n", query.Metric_id, query.From, query.To, query.Aggregation, query.AggregationWindowSecs)
 	//Esperar por la respuesta desde self.queue
 	//Enviar mensaje QueryResponse al cliente
 	send_ok(client) //Change
-	//retornar
 }
 
 func send_error(client *socket.TCPConnection, message string) error {

@@ -10,16 +10,19 @@ import (
 )
 
 type ClientConfig struct {
-	Id             uint
-	Server_address string
-	Loop_period    time.Duration
+	Id              uint
+	Server_address  string
+	Loop_period     time.Duration
+	Number_of_loops uint
 }
 
 type Client struct {
-	server       *socket.TCPConnection
-	loop_period  time.Duration
-	quit         chan bool
-	has_finished chan bool
+	id              uint
+	server          *socket.TCPConnection
+	loop_period     time.Duration
+	number_of_loops uint
+	quit            chan bool
+	has_finished    chan bool
 }
 
 func Start(config ClientConfig) (*Client, error) {
@@ -31,10 +34,12 @@ func Start(config ClientConfig) (*Client, error) {
 
 	fmt.Println("Connection with server established")
 	client := &Client{
-		server:       server,
-		quit:         make(chan bool, 2),
-		has_finished: make(chan bool, 2),
-		loop_period:  config.Loop_period,
+		id:              config.Id,
+		server:          server,
+		quit:            make(chan bool, 2),
+		has_finished:    make(chan bool, 2),
+		loop_period:     config.Loop_period,
+		number_of_loops: config.Number_of_loops,
 	}
 
 	go client.run()
@@ -54,12 +59,12 @@ func (self *Client) run() {
 	}()
 
 Loop:
-	for i := uint32(1); i < 20; i++ {
+	for i := uint(1); i < self.number_of_loops; i++ {
 		select {
 		case <-self.quit:
 			break Loop
 		default:
-			message := randomMessage(i)
+			message := randomMessage(self.id)
 			fmt.Printf("Sending to server: %v\n", message)
 			err := protocol.Send(self.server, message)
 			if err != nil {
@@ -71,18 +76,40 @@ Loop:
 				fmt.Println(Err.Ctx("Error receiving response from server", err))
 				return
 			}
-			fmt.Printf("Received from server: %T\n", response)
+			should_finish := parse_server_response(response)
+			if should_finish {
+				return
+			}
 		}
 		time.Sleep(self.loop_period)
 	}
 	protocol.Send(self.server, &protocol.Finish{})
 }
 
-func randomMessage(idx uint32) protocol.Encodable {
+func parse_server_response(response protocol.Encodable) bool {
+
+	switch t := response.(type) {
+	case *protocol.Ok:
+		fmt.Println("Ok")
+	case *protocol.Error:
+		fmt.Printf("ERROR: %v\n", t.Message)
+	case *protocol.Finish:
+		if len(t.Message) == 0 {
+			fmt.Println("Finish")
+		} else {
+			fmt.Printf("Finish: %v\n", t.Message)
+		}
+		return true
+	}
+
+	return false
+}
+
+func randomMessage(id uint) protocol.Encodable {
 	switch x := rand.Intn(100); {
 	case x < 20:
 		return &protocol.Query{
-			Metric_id:             fmt.Sprintf("CPU_USAGE_%v", idx),
+			Metric_id:             fmt.Sprintf("CLI_METRIC_%v", id),
 			From:                  "2020-01-01T14:23:44",
 			To:                    "2020-01-01T14:25:44",
 			Aggregation:           "MAX",
@@ -90,8 +117,8 @@ func randomMessage(idx uint32) protocol.Encodable {
 		}
 	default:
 		return &protocol.Metric{
-			Id:    fmt.Sprintf("CPU_USAGE_%v", idx),
-			Value: float64(idx) * 1.1,
+			Id:    fmt.Sprintf("CLI_METRIC_%v", id),
+			Value: float64(id),
 		}
 
 	}

@@ -1,6 +1,7 @@
 package dispatcher
 
 import (
+	"distribuidos/tp1/common/protocol"
 	"distribuidos/tp1/server/src/messages"
 	"fmt"
 )
@@ -85,10 +86,16 @@ func (self *Dispatcher) dispatch(message messages.DispatcherMessage) {
 func (self *Dispatcher) handle_new_connection(conn *messages.NewConnection) {
 	//TODO: Estaria bueno poder obtener ip y puerto de la conexion entrante
 	fmt.Println("New connection has arrived to the server")
-	fmt.Printf("%v\n", conn.Skt)
 	//TODO: Acá habria que hacer un chequeo de rate limiting
-	conn_id := <-self.free_connections
-	self.connections[conn_id] <- conn
+	select {
+	case conn_id := <-self.free_connections:
+		fmt.Println("Free conn available")
+		self.connections[conn_id] <- conn
+	default:
+		fmt.Println("There isn't any connection workers free, discarding...")
+		protocol.Send(conn.Skt, &protocol.Finish{Message: "Servicio no disponible"})
+		conn.Skt.Close()
+	}
 }
 
 func (self *Dispatcher) handle_query_response(query *messages.QueryResponse) {

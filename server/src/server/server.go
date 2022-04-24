@@ -7,7 +7,6 @@ import (
 	"distribuidos/tp1/server/src/database"
 	"distribuidos/tp1/server/src/dispatcher"
 	"distribuidos/tp1/server/src/messages"
-	"fmt"
 	"time"
 )
 
@@ -72,7 +71,6 @@ func Start(config ServerConfig) (*Server, error) {
 	if err != nil {
 		return nil, Err.Ctx("Error starting Acceptor", err)
 	}
-	fmt.Println(conn_workers, db, dispatcher, acceptor)
 
 	server := &Server{
 		acceptor:     acceptor,
