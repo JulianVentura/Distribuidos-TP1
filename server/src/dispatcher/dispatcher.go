@@ -3,7 +3,8 @@ package dispatcher
 import (
 	"distribuidos/tp1/common/protocol"
 	"distribuidos/tp1/server/src/messages"
-	"fmt"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type Dispatcher struct {
@@ -37,6 +38,7 @@ func Start(
 
 	go dispatcher.run()
 
+	log.Info("Dispatcher started")
 	return dispatcher, nil
 }
 
@@ -66,6 +68,7 @@ Finish:
 		}
 	}
 
+	log.Info("Dispatcher finished")
 	close(self.queue)
 	self.has_finished <- true
 }
@@ -79,20 +82,19 @@ func (self *Dispatcher) dispatch(message messages.DispatcherMessage) {
 	case messages.ConnectionFinished:
 		self.handle_connection_finished(&m)
 	default:
-		fmt.Println("ERROR: An unknown message was assigned to dispatcher")
+		log.Error("An unknown message was assigned to dispatcher")
 	}
 }
 
 func (self *Dispatcher) handle_new_connection(conn *messages.NewConnection) {
 	//TODO: Estaria bueno poder obtener ip y puerto de la conexion entrante
-	fmt.Println("New connection has arrived to the server")
+	log.Info("New connection has arrived to the server")
 	//TODO: Acá habria que hacer un chequeo de rate limiting
 	select {
 	case conn_id := <-self.free_connections:
-		fmt.Println("Free conn available")
 		self.connections[conn_id] <- conn
 	default:
-		fmt.Println("There isn't any connection workers free, discarding...")
+		log.Info("There isn't any connection workers free, discarding...")
 		protocol.Send(conn.Skt, &protocol.Finish{Message: "Servicio no disponible"})
 		conn.Skt.Close()
 	}
@@ -101,7 +103,7 @@ func (self *Dispatcher) handle_new_connection(conn *messages.NewConnection) {
 func (self *Dispatcher) handle_query_response(query *messages.QueryResponse) {
 	conn_id := query.Conn_worker_id
 	if conn_id >= uint(len(self.connections)) {
-		fmt.Printf("ERROR: Received a QueryResponse with conn_id %v, which is invalid\n", conn_id)
+		log.Errorf("Received a QueryResponse with conn_id %v, which is invalid", conn_id)
 	}
 	self.connections[conn_id] <- query
 }
@@ -109,7 +111,7 @@ func (self *Dispatcher) handle_query_response(query *messages.QueryResponse) {
 func (self *Dispatcher) handle_connection_finished(conn *messages.ConnectionFinished) {
 	conn_id := conn.Conn_worker_id
 	if conn_id >= uint(len(self.connections)) {
-		fmt.Printf("ERROR: Received a ConnectionFinished with conn_id %v, which is invalid\n", conn_id)
+		log.Errorf("Received a ConnectionFinished with conn_id %v, which is invalid", conn_id)
 	}
 	self.free_connections <- conn_id
 }

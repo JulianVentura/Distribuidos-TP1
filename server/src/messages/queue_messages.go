@@ -21,6 +21,14 @@ type ReadDatabaseMessage interface {
 	implementsReadDatabaseMessage()
 }
 
+type MergerAdminMessage interface {
+	implementsMergerAdminMessage()
+}
+
+type MergersMessage interface {
+	implementsMergersMessage()
+}
+
 type NewConnection struct {
 	Skt *socket.TCPConnection
 }
@@ -44,6 +52,33 @@ type NewQuery struct {
 	Query          models.Query
 }
 
+type EpochEnd struct {
+	Writer_id        uint
+	Epoch            uint64
+	Modified_metrics []string
+}
+
+type AppendFinished struct {
+	Metric_id string
+}
+
+type MergeFinished struct {
+	Metric_id string
+	File      string
+}
+
+type Merge struct {
+	Metric_id string
+	File_1    string
+	File_2    string
+}
+
+type Append struct {
+	Metric_id      string
+	File_to_append string
+	DB_file        string
+}
+
 func (NewConnection) implementsDispatcherMessage()       {}
 func (NewConnection) implementsConnectionWorkerMessage() {}
 
@@ -54,3 +89,10 @@ func (QueryResponse) implementsConnectionWorkerMessage() {}
 
 func (NewMetric) implementsWriteDatabaseMessage() {}
 func (NewMetric) implementsReadDatabaseMessage()  {}
+
+func (EpochEnd) implementsMergerAdminMessage()       {}
+func (MergeFinished) implementsMergerAdminMessage()  {}
+func (AppendFinished) implementsMergerAdminMessage() {}
+
+func (Merge) implementsMergersMessage()  {}
+func (Append) implementsMergersMessage() {}

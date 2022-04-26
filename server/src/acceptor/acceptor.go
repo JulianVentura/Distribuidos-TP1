@@ -5,6 +5,8 @@ import (
 	"distribuidos/tp1/common/socket"
 	"distribuidos/tp1/server/src/messages"
 	"fmt"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type AcceptorConfig struct {
@@ -35,6 +37,7 @@ func Start(config AcceptorConfig, dispatcher chan messages.DispatcherMessage) (*
 
 	go acc.run()
 
+	log.Infof("Acceptor started")
 	return acc, nil
 }
 
@@ -49,10 +52,10 @@ func (self *Acceptor) run() {
 		conn, err := self.skt.Accept()
 		if err != nil {
 			if self.finish == true {
-				fmt.Println("Acceptor Worker has been closed")
+				log.Infof("Acceptor Worker has finished")
 				break
 			}
-			panic("Accept has failed") // TODO: Ver como informar de un error fatal al servidor, para su finalizacion
+			log.Fatal("Accept has failed") // TODO: Ver como informar de un error fatal al servidor, para su finalizacion
 		}
 
 		self.dispatcher <- messages.NewConnection{Skt: &conn}

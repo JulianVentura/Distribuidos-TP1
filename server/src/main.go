@@ -2,8 +2,6 @@ package main
 
 import (
 	Err "distribuidos/tp1/common/errors"
-	"distribuidos/tp1/common/protocol"
-	"distribuidos/tp1/common/socket"
 	"distribuidos/tp1/server/src/server"
 	"fmt"
 	"os"
@@ -12,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -38,6 +37,7 @@ func InitConfig() (server.ServerConfig, error) {
 	v.BindEnv("id")
 	v.BindEnv("server", "ip")
 	v.BindEnv("server", "port")
+	v.BindEnv("log", "level")
 	v.BindEnv("workers", "database", "writers")
 	v.BindEnv("workers", "database", "readers")
 	v.BindEnv("workers", "database", "mergers")
@@ -61,8 +61,13 @@ func InitConfig() (server.ServerConfig, error) {
 		return c_config, Err.Ctx("Could not parse client_timeout as time.Duration.", err)
 	}
 
+	if _, err := time.ParseDuration(v.GetString("database.epoch-duration")); err != nil {
+		return c_config, Err.Ctx("Could not parse database_epoch_duration as time.Duration.", err)
+	}
+
 	c_config.Server_ip = v.GetString("address.ip")
 	c_config.Server_port = v.GetString("address.port")
+	c_config.Log_level = v.GetString("log.level")
 	c_config.Client_conn_timeout = v.GetDuration("client.timeout")
 	c_config.DB_writers_number = v.GetUint("workers.database.writers")
 	c_config.DB_readers_number = v.GetUint("workers.database.readers")
@@ -70,68 +75,56 @@ func InitConfig() (server.ServerConfig, error) {
 	c_config.Con_worker_number = v.GetUint("workers.connection")
 	c_config.DB_writers_queue_size = v.GetUint("queues.database.writers")
 	c_config.DB_readers_queue_size = v.GetUint("queues.database.readers")
+	c_config.DB_merge_admin_queue_size = v.GetUint("queues.database.merger-admin")
 	c_config.DB_mergers_queue_size = v.GetUint("queues.database.mergers")
 	c_config.Con_worker_queue_size = v.GetUint("queues.connection")
 	c_config.Dispatcher_queue_size = v.GetUint("queues.dispatcher")
+	c_config.DB_epoch_duration = v.GetDuration("database.epoch-duration")
+	c_config.DB_files_path = v.GetString("database.files-path")
 
 	return c_config, nil
 
 }
 
-func PrintConfig(config *server.ServerConfig) {
-	fmt.Println("Server configuration")
-	fmt.Printf("Server IP: %s\n", config.Server_ip)
-	fmt.Printf("Server PORT: %s\n", config.Server_port)
-	fmt.Printf("Client connection timeout: %s\n", config.Client_conn_timeout)
-	fmt.Println("Number of workers:")
-	fmt.Printf(" - Database writers: %v\n", config.DB_writers_number)
-	fmt.Printf(" - Database readers: %v\n", config.DB_readers_number)
-	fmt.Printf(" - Database mergers: %v\n", config.DB_mergers_number)
-	fmt.Printf(" - Connections: %v\n", config.Con_worker_number)
-	fmt.Println("Queue size:")
-	fmt.Printf(" - Database writers: %v\n", config.DB_writers_queue_size)
-	fmt.Printf(" - Database readers: %v\n", config.DB_readers_queue_size)
-	fmt.Printf(" - Database mergers: %v\n", config.DB_mergers_queue_size)
-	fmt.Printf(" - Connections: %v\n", config.Con_worker_queue_size)
-	fmt.Printf(" - Dispatcher: %v\n", config.Dispatcher_queue_size)
+// InitLogger Receives the log level to be set in logrus as a string. This method
+// parses the string and set the level to the logger. If the level string is not
+// valid an error is returned
+func InitLogger(logLevel string) error {
+	level, err := log.ParseLevel(logLevel)
+	if err != nil {
+		return err
+	}
+
+	log.SetLevel(level)
+	log.SetFormatter(&log.TextFormatter{
+		ForceColors:      true,
+		DisableTimestamp: true,
+	})
+	return nil
 }
 
-func handleClientConnection(c *server.ServerConfig) error {
-
-	server, err := socket.NewServer(fmt.Sprintf("%v:%v", c.Server_ip, c.Server_port))
-	if err != nil {
-		return err
-	}
-	fmt.Println("Server Started")
-	client, err := server.Accept()
-	fmt.Println("New Client has arrived")
-	if err != nil {
-		return err
-	}
-	_ = server.Close()
-
-Loop:
-	for {
-		fmt.Println("Receiving a message from client")
-		message, err := protocol.Receive(&client)
-		if err != nil {
-			fmt.Printf("Receive message failed: %v", err)
-			break Loop
-		}
-		switch m := message.(type) {
-		case *protocol.Metric:
-			fmt.Printf(" - Metric: (%v, %v)\n", m.Id, m.Value)
-		case *protocol.Query:
-			fmt.Printf(" - Query: (%v, %v, %v, %v, %v)\n", m.Metric_id, m.From, m.To, m.Aggregation, m.AggregationWindowSecs)
-		case *protocol.Finish:
-			fmt.Println("Client finished, closing...")
-			break Loop
-		}
-	}
-
-	_ = client.Close()
-
-	return nil
+func PrintConfig(config *server.ServerConfig) {
+	log.Infof("Server configuration")
+	log.Infof("Server IP: %s", config.Server_ip)
+	log.Infof("Server PORT: %s", config.Server_port)
+	log.Infof("Server Log Level: %s", config.Log_level)
+	log.Infof("Client connection timeout: %s", config.Client_conn_timeout)
+	log.Infof("Number of workers:")
+	log.Infof(" - Database writers: %v", config.DB_writers_number)
+	log.Infof(" - Database readers: %v", config.DB_readers_number)
+	log.Infof(" - Database mergers: %v", config.DB_mergers_number)
+	log.Infof(" - Connections: %v", config.Con_worker_number)
+	log.Infof("Queue size:")
+	log.Infof(" - Database writers: %v", config.DB_writers_queue_size)
+	log.Infof(" - Database readers: %v", config.DB_readers_queue_size)
+	log.Infof(" - Database readers: %v", config.DB_readers_queue_size)
+	log.Infof(" - Database merger admin: %v", config.DB_merge_admin_queue_size)
+	log.Infof(" - Database mergers: %v", config.DB_mergers_queue_size)
+	log.Infof(" - Connections: %v", config.Con_worker_queue_size)
+	log.Infof(" - Dispatcher: %v", config.Dispatcher_queue_size)
+	log.Infof("Database:")
+	log.Infof(" - Epoch duration: %v", config.DB_epoch_duration)
+	log.Infof(" - Files path: %v", config.DB_files_path)
 }
 
 func main() {
@@ -141,17 +134,22 @@ func main() {
 		fmt.Printf("Error found on configuration. %v\n", err)
 		return
 	}
+
+	if err := InitLogger(config.Log_level); err != nil {
+		log.Fatalf("%s", err)
+	}
+
 	PrintConfig(&config)
 
 	server, err := server.Start(config)
 	if err != nil {
-		fmt.Printf("Error starting server. %v\n", err)
+		log.Fatal("Error starting server. %v", err)
 		return
 	}
 	exit := make(chan os.Signal, 1)
 	signal.Notify(exit, syscall.SIGTERM)
 	<-exit
 
-	fmt.Println("Shuting down server...")
+	log.Infof("Shuting down server...")
 	server.Finish()
 }

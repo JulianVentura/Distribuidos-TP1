@@ -23,7 +23,6 @@ func InitConfig() (*viper.Viper, error) {
 
 	// Configure viper to read env variables with the CLI_ prefix
 	v.AutomaticEnv()
-	v.SetEnvPrefix("cli")
 	// Use a replacer to replace env variables underscores with points. This let us
 	// use nested configurations in the config file and at the same time define
 	// env variables for the nested configurations
@@ -51,6 +50,15 @@ func InitConfig() (*viper.Viper, error) {
 	return v, nil
 }
 
+func PrintConfig(c_config *client.ClientConfig) {
+	fmt.Printf("Client %v configuration: \n", c_config.Id)
+	fmt.Printf(" - ID: %v\n", c_config.Id)
+	fmt.Printf(" - Server Address: %v\n", c_config.Server_address)
+	fmt.Printf(" - Loop Period: %v\n", c_config.Loop_period)
+	fmt.Printf(" - Number of Loops: %v\n", c_config.Number_of_loops)
+	fmt.Print("----\n\n")
+}
+
 func main() {
 	fmt.Println("Starting Client...")
 	config, err := InitConfig()
@@ -65,6 +73,8 @@ func main() {
 		Loop_period:     config.GetDuration("loop.period"),
 		Number_of_loops: config.GetUint("loop.number"),
 	}
+
+	PrintConfig(&c_config)
 
 	cli, err := client.Start(c_config)
 

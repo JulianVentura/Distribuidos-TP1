@@ -3,16 +3,22 @@ address:
   port: "12345"
 client:
   timeout: 5s
+log:
+  level: 'debug'
 workers:
   database:
-    writers: 1
+    writers: 10
     readers: 1
-    mergers: 1
-  connection: 2
+    mergers: 10
+  connection: 3
 queues:
   database:
     readers: 8
-    writers: 8
-    mergers: 8
-  connection: 4
-  dispatcher: 20
+    writers: 256
+    merger-admin: 256
+    mergers: 256
+  connection: 64
+  dispatcher: 256
+database:
+  epoch-duration: 5s
+  files-path: ./files

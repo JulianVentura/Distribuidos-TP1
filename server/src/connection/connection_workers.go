@@ -5,8 +5,9 @@ import (
 	"distribuidos/tp1/common/socket"
 	"distribuidos/tp1/server/src/messages"
 	"distribuidos/tp1/server/src/models"
-	"fmt"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 //TODO: Change
@@ -14,6 +15,8 @@ type ConnectionWorker struct {
 	id           uint
 	queue        chan messages.ConnectionWorkerMessage
 	dispatcher   chan messages.DispatcherMessage
+	event_queue  chan messages.WriteDatabaseMessage
+	query_queue  chan messages.ReadDatabaseMessage
 	quit         chan bool
 	has_finished chan bool
 	conn_timeout time.Duration
@@ -29,12 +32,16 @@ func StartConnectionWorker(
 	config ConnectionWorkerConfig,
 	queue chan messages.ConnectionWorkerMessage,
 	dispatcher chan messages.DispatcherMessage,
+	event_queue chan messages.WriteDatabaseMessage,
+	query_queue chan messages.ReadDatabaseMessage,
 ) (*ConnectionWorker, error) {
 
 	worker := &ConnectionWorker{
 		id:           config.Id,
 		queue:        queue,
 		dispatcher:   dispatcher,
+		event_queue:  event_queue,
+		query_queue:  query_queue,
 		quit:         make(chan bool, 2),
 		has_finished: make(chan bool, 2),
 		conn_timeout: config.Connection_timeout,
@@ -57,15 +64,13 @@ Loop:
 		case <-self.quit:
 			break Loop
 		case message := <-self.queue:
-			fmt.Println("New message received in worker")
 			switch m := message.(type) {
 			case *messages.NewConnection:
 				self.handle_client_connection(m.Skt)
-				fmt.Println("Client connection finished")
 			case *messages.QueryResponse:
-				fmt.Println("ERROR: A query response was assigned to a worker without an active connection")
+				log.Errorf("A query response was assigned to a worker without an active connection")
 			default:
-				fmt.Printf("ERROR: An unknown message was assigned to a worker %v\n", m)
+				log.Errorf("An unknown message was assigned to a worker %v", m)
 			}
 		}
 	}
@@ -104,6 +109,8 @@ Loop:
 	self.dispatcher <- messages.ConnectionFinished{
 		Conn_worker_id: self.id,
 	}
+
+	log.Debug("Client connection finished")
 }
 
 func (self *ConnectionWorker) handle_new_metric(m *protocol.Metric, client *socket.TCPConnection) {
@@ -114,20 +121,23 @@ func (self *ConnectionWorker) handle_new_metric(m *protocol.Metric, client *sock
 		return
 	}
 	//Encolar en la cola de writers de bdd
-	fmt.Printf(" - Metric: (%v, %v)\n", metric.Id, metric.Value)
+	self.event_queue <- &messages.NewMetric{
+		Conn_worker_id: self.id,
+		Metric:         metric,
+	}
 	//Enviar mensaje OK al cliente
 	send_ok(client)
 }
 
 func (self *ConnectionWorker) handle_query(q *protocol.Query, client *socket.TCPConnection) {
 	//Instanciar query a nivel business
-	query, err := models.NewQuery(q.Metric_id, q.From, q.To, q.Aggregation, q.AggregationWindowSecs)
+	_, err := models.NewQuery(q.Metric_id, q.From, q.To, q.Aggregation, q.AggregationWindowSecs)
 	if err != nil {
 		send_error(client, "Bad formating")
 		return
 	}
 	//Encolar en la cola de readers de bdd
-	fmt.Printf(" - Query: (%v, %v, %v, %v, %v)\n", query.Metric_id, query.From, query.To, query.Aggregation, query.AggregationWindowSecs)
+	// fmt.Printf(" - Query: (%v, %v, %v, %v, %v)\n", query.Metric_id, query.From, query.To, query.Aggregation, query.AggregationWindowSecs)
 	//Esperar por la respuesta desde self.queue
 	//Enviar mensaje QueryResponse al cliente
 	send_ok(client) //Change

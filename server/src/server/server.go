@@ -11,6 +11,8 @@ import (
 )
 
 type ServerConfig struct {
+	//Logging
+	Log_level string
 	//Connection
 	Server_ip           string
 	Server_port         string
@@ -21,11 +23,15 @@ type ServerConfig struct {
 	DB_readers_number uint
 	DB_mergers_number uint
 	//Queues sizes
-	DB_readers_queue_size uint
-	DB_writers_queue_size uint
-	DB_mergers_queue_size uint
-	Con_worker_queue_size uint
-	Dispatcher_queue_size uint
+	DB_readers_queue_size     uint
+	DB_writers_queue_size     uint
+	DB_merge_admin_queue_size uint
+	DB_mergers_queue_size     uint
+	Con_worker_queue_size     uint
+	Dispatcher_queue_size     uint
+	//Database
+	DB_epoch_duration time.Duration
+	DB_files_path     string
 }
 
 type ServerQueues struct {
@@ -46,51 +52,66 @@ type Server struct {
 // TODO: Realizar limpieza en caso de error y modularizar
 func Start(config ServerConfig) (*Server, error) {
 
+	//Iniciamos una estructura vacia
+
+	self := &Server{
+		acceptor:     nil,
+		conn_workers: nil,
+		dispatcher:   nil,
+		database:     nil,
+	}
 	//Iniciamos las colas de mensajes
 	queues := start_queues(&config)
 
 	//Iniciamos la base de datos
-	db, err := start_database(&config, &queues)
+	err := self.start_database(&config, &queues)
 	if err != nil {
+		self.Finish()
 		return nil, Err.Ctx("Error starting Database", err)
 	}
 	//Iniciamos a los connection workers
-	conn_workers, err := start_connection_workers(&config, &queues)
+	err = self.start_connection_workers(&config, &queues)
 	if err != nil {
+		self.Finish()
 		return nil, Err.Ctx("Error starting Connection Workers", err)
 	}
 	//Iniciamos al servicio de alarma
 	//TODO
 	//Iniciamos al dispatcher
-	dispatcher, err := start_dispatcher(&config, &queues)
+	err = self.start_dispatcher(&config, &queues)
 	if err != nil {
+		self.Finish()
 		return nil, Err.Ctx("Error starting Dispatcher", err)
 	}
 	//Iniciamos al aceptador
-	acceptor, err := start_acceptor(&config, &queues)
+	err = self.start_acceptor(&config, &queues)
 	if err != nil {
+		self.Finish()
 		return nil, Err.Ctx("Error starting Acceptor", err)
 	}
 
-	server := &Server{
-		acceptor:     acceptor,
-		conn_workers: conn_workers,
-		dispatcher:   dispatcher,
-		database:     db,
-	}
-	return server, nil
+	return self, nil
 }
 
 func (self *Server) Finish() {
 	//Cerrar al aceptador
-	self.acceptor.Finish()
+	if self.acceptor != nil {
+		self.acceptor.Finish()
+	}
 	//Cerrar las conexiones
-	for _, conn := range self.conn_workers {
-		conn.Finish()
+	if self.conn_workers != nil {
+		for _, conn := range self.conn_workers {
+			conn.Finish()
+		}
 	}
 	//Cerrar la base de datos
+	if self.database != nil {
+		self.database.Finish()
+	}
 	//Cerrar el dispatcher
-	self.dispatcher.Finish()
+	if self.dispatcher != nil {
+		self.dispatcher.Finish()
+	}
 }
 
 func start_queues(config *ServerConfig) ServerQueues {
@@ -108,46 +129,76 @@ func start_queues(config *ServerConfig) ServerQueues {
 	}
 }
 
-func start_database(config *ServerConfig, queues *ServerQueues) (*database.Database, error) {
+func (self *Server) start_database(config *ServerConfig, queues *ServerQueues) error {
 	db_config := database.DatabaseConfig{
-		N_readers: config.DB_readers_number,
-		N_writers: config.DB_writers_number,
-		N_mergers: config.DB_mergers_number,
+		N_readers:              config.DB_readers_number,
+		N_writers:              config.DB_writers_number,
+		N_mergers:              config.DB_mergers_number,
+		Merge_admin_queue_size: config.DB_merge_admin_queue_size,
+		Mergers_queue_size:     config.DB_mergers_queue_size,
+		Epoch_duration:         config.DB_epoch_duration,
+		Files_path:             config.DB_files_path,
 	}
-	return database.Start(db_config, queues.Read_db_queue, queues.Write_db_queue, queues.Dispatcher_queue)
+	db, err := database.Start_database(db_config, queues.Read_db_queue, queues.Write_db_queue, queues.Dispatcher_queue)
+	if err != nil {
+		return err
+	}
+
+	self.database = db
+
+	return nil
 }
 
-func start_connection_workers(config *ServerConfig, queues *ServerQueues) ([]*connection.ConnectionWorker, error) {
-	connections := make([]*connection.ConnectionWorker, config.Con_worker_number)
+func (self *Server) start_connection_workers(config *ServerConfig, queues *ServerQueues) error {
+	self.conn_workers = make([]*connection.ConnectionWorker, config.Con_worker_number)
 	w_config := connection.ConnectionWorkerConfig{
 		Id:                 0,
 		Connection_timeout: config.Client_conn_timeout,
 	}
 	for i := uint(0); i < config.Con_worker_number; i++ {
 		w_config.Id = i
-		conn, err := connection.StartConnectionWorker(w_config, queues.Con_worker_queue[i], queues.Dispatcher_queue)
+		conn, err := connection.StartConnectionWorker(
+			w_config,
+			queues.Con_worker_queue[i],
+			queues.Dispatcher_queue,
+			queues.Write_db_queue,
+			queues.Read_db_queue)
 		if err != nil {
-			//TODO:
-			//Limpiar acá las conexiones ya creadas, posiblemente cerrando el canal
-			return connections, err
+			return err
 		}
-		connections[i] = conn
+		self.conn_workers[i] = conn
 	}
 
-	return connections, nil
+	return nil
 }
 
-func start_dispatcher(config *ServerConfig, queues *ServerQueues) (*dispatcher.Dispatcher, error) {
+func (self *Server) start_dispatcher(config *ServerConfig, queues *ServerQueues) error {
 
 	//TODO: Check this
 	d_config := dispatcher.DispatcherConfig{}
-	return dispatcher.Start(d_config, queues.Dispatcher_queue, queues.Con_worker_queue)
+	dispatcher, err := dispatcher.Start(d_config, queues.Dispatcher_queue, queues.Con_worker_queue)
+
+	if err != nil {
+		return err
+	}
+
+	self.dispatcher = dispatcher
+
+	return nil
 }
 
-func start_acceptor(config *ServerConfig, queues *ServerQueues) (*acceptor.Acceptor, error) {
+func (self *Server) start_acceptor(config *ServerConfig, queues *ServerQueues) error {
 	acceptor_config := acceptor.AcceptorConfig{
 		Host: config.Server_ip,
 		Port: config.Server_port,
 	}
-	return acceptor.Start(acceptor_config, queues.Dispatcher_queue)
+	acceptor, err := acceptor.Start(acceptor_config, queues.Dispatcher_queue)
+
+	if err != nil {
+		return err
+	}
+
+	self.acceptor = acceptor
+
+	return nil
 }

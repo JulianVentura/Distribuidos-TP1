@@ -59,7 +59,7 @@ func (self *Client) run() {
 	}()
 
 Loop:
-	for i := uint(1); i < self.number_of_loops; i++ {
+	for i := uint(0); i < self.number_of_loops; i++ {
 		select {
 		case <-self.quit:
 			break Loop
@@ -107,7 +107,7 @@ func parse_server_response(response protocol.Encodable) bool {
 
 func randomMessage(id uint) protocol.Encodable {
 	switch x := rand.Intn(100); {
-	case x < 20:
+	case x < 0:
 		return &protocol.Query{
 			Metric_id:             fmt.Sprintf("CLI_METRIC_%v", id),
 			From:                  "2020-01-01T14:23:44",

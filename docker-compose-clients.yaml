@@ -9,35 +9,35 @@ services:
         source: ./client_app/config.yaml
         target: /config.yaml
     environment:
-      - ID=1
+      - ID=0
     networks:
       - tp1_net
 
-  # client_app_2:
-  #   container_name: client_app_2
-  #   image: client_app:latest
-  #   entrypoint: /client_app
-  #   volumes:
-  #     - type: bind 
-  #       source: ./client_app/config.yaml
-  #       target: /config.yaml
-  #   environment:
-  #     - ID=2
-  #   networks:
-  #     - tp1_net
+  client_app_2:
+    container_name: client_app_2
+    image: client_app:latest
+    entrypoint: /client_app
+    volumes:
+      - type: bind 
+        source: ./client_app/config.yaml
+        target: /config.yaml
+    environment:
+      - ID=0
+    networks:
+      - tp1_net
  
-  # client_app_3:
-  #   container_name: client_app_3
-  #   image: client_app:latest
-  #   entrypoint: /client_app
-  #   volumes:
-  #     - type: bind 
-  #       source: ./client_app/config.yaml
-  #       target: /config.yaml
-  #   environment:
-  #     - ID=3
-  #   networks:
-  #     - tp1_net
+  client_app_3:
+    container_name: client_app_3
+    image: client_app:latest
+    entrypoint: /client_app
+    volumes:
+      - type: bind 
+        source: ./client_app/config.yaml
+        target: /config.yaml
+    environment:
+      - ID=0
+    networks:
+      - tp1_net
 
 
 networks:
