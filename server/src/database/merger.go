@@ -130,6 +130,14 @@ func (self *merger) handle_merge(m *messages.Merge) error {
 
 	//TODO: Delete de los archivos file_1 y file_2
 
+	err = os.Remove(m.File_1)
+	if err != nil {
+		log.Errorf("Merger: Failed to remove %v file", m.File_1)
+	}
+	err = os.Remove(m.File_2)
+	if err != nil {
+		log.Errorf("Merger: Failed to remove %v file", m.File_2)
+	}
 	err = write_from_lines(result_file_path, result)
 	if err != nil {
 		return err
@@ -173,6 +181,10 @@ func (self *merger) handle_append(m *messages.Append) error {
 
 	//TODO: Delete del archivo previo file_to_append
 
+	err = os.Remove(m.File_to_append)
+	if err != nil {
+		log.Errorf("Merger: Failed to remove %v file", m.File_to_append)
+	}
 	msg := &messages.AppendFinished{
 		Metric_id: m.Metric_id,
 	}

@@ -7,10 +7,10 @@ log:
   level: 'debug'
 workers:
   database:
-    writers: 10
+    writers: 3
     readers: 1
-    mergers: 10
-  connection: 3
+    mergers: 3
+  connection: 10
 queues:
   database:
     readers: 8
@@ -20,5 +20,5 @@ queues:
   connection: 64
   dispatcher: 256
 database:
-  epoch-duration: 5s
+  epoch-duration: 0.5s
   files-path: ./files

@@ -9,7 +9,7 @@ services:
         source: ./client_app/config.yaml
         target: /config.yaml
     environment:
-      - ID=0
+      - ID=1
     networks:
       - tp1_net
 
@@ -22,7 +22,7 @@ services:
         source: ./client_app/config.yaml
         target: /config.yaml
     environment:
-      - ID=0
+      - ID=2
     networks:
       - tp1_net
  
@@ -35,11 +35,74 @@ services:
         source: ./client_app/config.yaml
         target: /config.yaml
     environment:
-      - ID=0
+      - ID=3
     networks:
       - tp1_net
 
+  client_app_4:
+    container_name: client_app_4
+    image: client_app:latest
+    entrypoint: /client_app
+    volumes:
+      - type: bind 
+        source: ./client_app/config.yaml
+        target: /config.yaml
+    environment:
+      - ID=4
+    networks:
+      - tp1_net
+ 
+  client_app_5:
+    container_name: client_app_5
+    image: client_app:latest
+    entrypoint: /client_app
+    volumes:
+      - type: bind 
+        source: ./client_app/config.yaml
+        target: /config.yaml
+    environment:
+      - ID=5
+    networks:
+      - tp1_net
 
+  client_app_6:
+    container_name: client_app_6
+    image: client_app:latest
+    entrypoint: /client_app
+    volumes:
+      - type: bind 
+        source: ./client_app/config.yaml
+        target: /config.yaml
+    environment:
+      - ID=6
+    networks:
+      - tp1_net
+
+  client_app_7:
+    container_name: client_app_7
+    image: client_app:latest
+    entrypoint: /client_app
+    volumes:
+      - type: bind 
+        source: ./client_app/config.yaml
+        target: /config.yaml
+    environment:
+      - ID=7
+    networks:
+      - tp1_net
+ 
+  client_app_8:
+    container_name: client_app_8
+    image: client_app:latest
+    entrypoint: /client_app
+    volumes:
+      - type: bind 
+        source: ./client_app/config.yaml
+        target: /config.yaml
+    environment:
+      - ID=8
+    networks:
+      - tp1_net
 networks:
   tp1_net:
     external:
