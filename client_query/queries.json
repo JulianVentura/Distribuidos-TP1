@@ -28,10 +28,10 @@
         "aggregation_window_secs": 10
     },
     {
-        "metric_id": "CLI_METRIC_1",
-        "from": "2022-04-28T05:35:00.000Z",
-        "to": "2022-04-28T05:35:00.010Z",
-        "aggregation": "COUNT",
+        "metric_id": "TEST_QUERY_1",
+        "from": "2022-04-27T22:12:25.012Z",
+        "to": "2022-04-27T22:12:34.022Z",
+        "aggregation": "MAX",
         "aggregation_window_secs": 0
     },
     {
@@ -47,7 +47,12 @@
         "to": "2022-04-28T05:35:00.010Z",
         "aggregation": "COUNT",
         "aggregation_window_secs": 0
+    },
+    {
+        "metric_id": "CLI_METRIC_1",
+        "from": "2022-04-27T22:12:25.012Z",
+        "to": "2022-04-30T22:12:34.022Z",
+        "aggregation": "COUNT",
+        "aggregation_window_secs": 1000000000
     }
-
-
 ]

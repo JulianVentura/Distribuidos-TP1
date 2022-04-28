@@ -4,13 +4,13 @@ address:
 client:
   timeout: 5s
 log:
-  level: 'debug'
+  level: 'info'
 workers:
   database:
     writers: 4
     readers: 4
     mergers: 4
-  connection: 1
+  connection: 10
 queues:
   database:
     readers: 64

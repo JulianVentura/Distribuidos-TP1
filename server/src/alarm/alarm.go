@@ -116,17 +116,17 @@ func (self *AlarmManager) send_query(alarm *Alarm) {
 
 func (self *AlarmManager) handle_query_response(m *messages.QueryResponse) {
 	if m.Is_error {
-		log.Error("AlarmManager: Wrong configuration, %v", m.Error_message)
+		log.Errorf("AlarmManager: Wrong configuration, %v", m.Error_message)
 		return
 	}
 	alarm, exists := self.alarms[m.Query.Id]
 	if !exists {
-		log.Error("AlarmManager: Received a response for an unknown alarm %v", m.Query.Id)
+		log.Errorf("AlarmManager: Received a response for an unknown alarm %v", m.Query.Id)
 		return
 	}
 	aggregation, err := bs.Aggregate(&m.Query, m.Response)
 	if err != nil {
-		log.Error("Aggregation failed on alarm %v. %v", alarm.id, err)
+		log.Errorf("Aggregation failed on alarm %v. %v", alarm.id, err)
 		return
 	}
 	for _, val := range aggregation {
