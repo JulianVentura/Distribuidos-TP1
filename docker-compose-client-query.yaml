@@ -1,0 +1,22 @@
+version: '3'
+services:
+  client_query:
+    container_name: client_query
+    image: client_query:latest
+    entrypoint: /client_query
+    volumes:
+      - type: bind 
+        source: ./client_query/config.yaml
+        target: /config.yaml
+      - type: bind 
+        source: ./client_query/queries.json
+        target: /queries.json
+    environment:
+      - ID=1
+    networks:
+      - tp1_net
+
+networks:
+  tp1_net:
+    external:
+      name: tp1_net

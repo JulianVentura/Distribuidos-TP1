@@ -1,4 +1,8 @@
 version: '3'
+networks:
+  tp1_net:
+    external:
+      name: tp1_net
 services:
   client_app_1:
     container_name: client_app_1
@@ -22,7 +26,7 @@ services:
         source: ./client_app/config.yaml
         target: /config.yaml
     environment:
-      - ID=2
+      - ID=1
     networks:
       - tp1_net
  
@@ -35,7 +39,7 @@ services:
         source: ./client_app/config.yaml
         target: /config.yaml
     environment:
-      - ID=3
+      - ID=1
     networks:
       - tp1_net
 
@@ -48,7 +52,7 @@ services:
         source: ./client_app/config.yaml
         target: /config.yaml
     environment:
-      - ID=4
+      - ID=1
     networks:
       - tp1_net
  
@@ -61,7 +65,7 @@ services:
         source: ./client_app/config.yaml
         target: /config.yaml
     environment:
-      - ID=5
+      - ID=1
     networks:
       - tp1_net
 
@@ -74,7 +78,7 @@ services:
         source: ./client_app/config.yaml
         target: /config.yaml
     environment:
-      - ID=6
+      - ID=1
     networks:
       - tp1_net
 
@@ -87,7 +91,7 @@ services:
         source: ./client_app/config.yaml
         target: /config.yaml
     environment:
-      - ID=7
+      - ID=1
     networks:
       - tp1_net
  
@@ -100,10 +104,6 @@ services:
         source: ./client_app/config.yaml
         target: /config.yaml
     environment:
-      - ID=8
+      - ID=1
     networks:
       - tp1_net
-networks:
-  tp1_net:
-    external:
-      name: tp1_net

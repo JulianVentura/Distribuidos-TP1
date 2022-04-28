@@ -59,7 +59,7 @@ Loop:
 	for {
 		select {
 		case <-self.quit:
-			self.quit <- true // De esta forma propagamos la señal
+			self.quit <- true // I think we don't need this, check
 			break Loop
 		case <-self.epoch_end:
 			self.change_epoch()
@@ -88,8 +88,8 @@ func (self *writer) handle_new_metric(metric *messages.NewMetric) {
 		self.epoch_mods[metric.Metric.Id] = true
 	}
 
-	timestamp := time.Now().UnixMilli()
-	encoded := encode_metric(&metric.Metric, timestamp) + "\n" //We add final \n to string
+	metric.Metric.Timestamp = uint64(time.Now().UnixMilli())
+	encoded := encode_metric(&metric.Metric) + "\n" //We add final \n to string
 
 	fd, err := os.OpenFile(file_name, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 
@@ -110,7 +110,6 @@ func (self *writer) handle_new_metric(metric *messages.NewMetric) {
 
 func (self *writer) change_epoch() {
 	//Notify epoch change to Merge Admin
-	log.Debugf("Worker %v changes epoch", self.config.id)
 	modified := make([]string, 0, len(self.epoch_mods))
 	for metric := range self.epoch_mods {
 		modified = append(modified, metric)

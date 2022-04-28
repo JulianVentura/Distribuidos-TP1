@@ -3,5 +3,7 @@
 **/Dockerfile
 **/docker-compose-*.yaml
 **/files
+**/alarms.json
+**/queries.json
 README.md
 Makefile

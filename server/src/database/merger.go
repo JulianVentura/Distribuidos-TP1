@@ -4,7 +4,6 @@ import (
 	"distribuidos/tp1/server/src/messages"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -16,8 +15,6 @@ type mergerConfig struct {
 	files_path string
 }
 
-//TODO: Ver el tema de la estructura para los locks
-// Se puede hacer una primera version sin ella para chequear que se esten mergeando correctamente los archivos
 type merger struct {
 	admin_queue      chan messages.MergerAdminMessage
 	queue            chan messages.MergersMessage
@@ -107,7 +104,6 @@ End:
 }
 
 func (self *merger) handle_merge(m *messages.Merge) error {
-	log.Debugf("Merger: Received merge message: %v", m)
 	lines_1, err := read_into_lines(m.File_1)
 	if err != nil {
 		return err
@@ -127,8 +123,6 @@ func (self *merger) handle_merge(m *messages.Merge) error {
 		self.completed_merges,
 		m.Metric_id)
 	self.completed_merges++
-
-	//TODO: Delete de los archivos file_1 y file_2
 
 	err = os.Remove(m.File_1)
 	if err != nil {
@@ -150,13 +144,19 @@ func (self *merger) handle_merge(m *messages.Merge) error {
 
 	self.admin_queue <- msg
 
-	log.Debugf("Merger: Send MergeFinished %v", msg)
 	return nil
 }
 
 func (self *merger) handle_append(m *messages.Append) error {
 
 	db_file_path := fmt.Sprintf("%v/%v", self.config.files_path, m.Metric_id)
+
+	if m.DB_file_lock != nil {
+		m.DB_file_lock.Lock()
+		defer func() {
+			m.DB_file_lock.Unlock()
+		}()
+	}
 
 	db_file, err := os.OpenFile(db_file_path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
 
@@ -179,8 +179,6 @@ func (self *merger) handle_append(m *messages.Append) error {
 		return fmt.Errorf("Error appending content into %v. %v\n", db_file, err)
 	}
 
-	//TODO: Delete del archivo previo file_to_append
-
 	err = os.Remove(m.File_to_append)
 	if err != nil {
 		log.Errorf("Merger: Failed to remove %v file", m.File_to_append)
@@ -191,28 +189,7 @@ func (self *merger) handle_append(m *messages.Append) error {
 
 	self.admin_queue <- msg
 
-	log.Debugf("Merger: Send AppendFinished %v", msg)
-
 	return nil
-}
-
-func read_into_lines(file string) ([]string, error) {
-	bytes, err := ioutil.ReadFile(file) //File descriptor is automatically closed
-	if err != nil {
-		return nil, fmt.Errorf("Couldn't open file %v. %v\n", file, err)
-	}
-
-	string_result := string(bytes)
-
-	splits := strings.Split(string_result, "\n")
-
-	l := len(splits)
-
-	if l > 0 {
-		splits = splits[:(l - 1)] //Filter out \n
-	}
-
-	return splits, nil
 }
 
 func write_from_lines(file string, lines []string) error {

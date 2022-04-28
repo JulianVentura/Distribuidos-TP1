@@ -8,11 +8,12 @@ import (
 )
 
 type Dispatcher struct {
-	queue            chan messages.DispatcherMessage
-	has_finished     chan bool
-	quit             chan bool
-	connections      []chan messages.ConnectionWorkerMessage
-	free_connections chan uint
+	queue              chan messages.DispatcherMessage
+	has_finished       chan bool
+	quit               chan bool
+	connections        []chan messages.ConnectionWorkerMessage
+	alarm_worker_queue chan messages.AlarmManagerMessage
+	free_connections   chan uint
 }
 
 type DispatcherConfig struct {
@@ -22,6 +23,7 @@ func Start(
 	config DispatcherConfig,
 	queue chan messages.DispatcherMessage,
 	connections []chan messages.ConnectionWorkerMessage,
+	alarm_worker_queue chan messages.AlarmManagerMessage,
 ) (*Dispatcher, error) {
 
 	free_conn := make(chan uint, len(connections))
@@ -29,11 +31,12 @@ func Start(
 		free_conn <- i
 	}
 	dispatcher := &Dispatcher{
-		queue:            queue,
-		has_finished:     make(chan bool, 2),
-		quit:             make(chan bool, 2),
-		connections:      connections,
-		free_connections: free_conn,
+		queue:              queue,
+		has_finished:       make(chan bool, 2),
+		quit:               make(chan bool, 2),
+		connections:        connections,
+		alarm_worker_queue: alarm_worker_queue,
+		free_connections:   free_conn,
 	}
 
 	go dispatcher.run()
@@ -58,6 +61,7 @@ Loop:
 		}
 	}
 
+	log.Info("Finishing Dispatcher")
 Finish:
 	for {
 		select {
@@ -68,28 +72,26 @@ Finish:
 		}
 	}
 
-	log.Info("Dispatcher finished")
-	close(self.queue)
 	self.has_finished <- true
+	log.Info("Dispatcher has finished")
 }
 
 func (self *Dispatcher) dispatch(message messages.DispatcherMessage) {
 	switch m := message.(type) {
-	case messages.NewConnection:
-		self.handle_new_connection(&m)
-	case messages.QueryResponse:
-		self.handle_query_response(&m)
-	case messages.ConnectionFinished:
-		self.handle_connection_finished(&m)
+	case *messages.NewConnection:
+		self.handle_new_connection(m)
+	case *messages.QueryResponse:
+		self.handle_query_response(m)
+	case *messages.ConnectionFinished:
+		self.handle_connection_finished(m)
 	default:
 		log.Error("An unknown message was assigned to dispatcher")
 	}
 }
 
 func (self *Dispatcher) handle_new_connection(conn *messages.NewConnection) {
-	//TODO: Estaria bueno poder obtener ip y puerto de la conexion entrante
 	log.Info("New connection has arrived to the server")
-	//TODO: Acá habria que hacer un chequeo de rate limiting
+
 	select {
 	case conn_id := <-self.free_connections:
 		self.connections[conn_id] <- conn
@@ -102,10 +104,14 @@ func (self *Dispatcher) handle_new_connection(conn *messages.NewConnection) {
 
 func (self *Dispatcher) handle_query_response(query *messages.QueryResponse) {
 	conn_id := query.Conn_worker_id
-	if conn_id >= uint(len(self.connections)) {
+	n_cons := uint(len(self.connections))
+	if conn_id > n_cons {
 		log.Errorf("Received a QueryResponse with conn_id %v, which is invalid", conn_id)
+	} else if conn_id == n_cons { //AlarmManager id
+		self.alarm_worker_queue <- query
+	} else {
+		self.connections[conn_id] <- query
 	}
-	self.connections[conn_id] <- query
 }
 
 func (self *Dispatcher) handle_connection_finished(conn *messages.ConnectionFinished) {

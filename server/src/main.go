@@ -65,6 +65,10 @@ func InitConfig() (server.ServerConfig, error) {
 		return c_config, Err.Ctx("Could not parse database_epoch_duration as time.Duration.", err)
 	}
 
+	if _, err := time.ParseDuration(v.GetString("alarm.period")); err != nil {
+		return c_config, Err.Ctx("Could not parse alarm_period as time.Duration.", err)
+	}
+
 	c_config.Server_ip = v.GetString("address.ip")
 	c_config.Server_port = v.GetString("address.port")
 	c_config.Log_level = v.GetString("log.level")
@@ -79,8 +83,11 @@ func InitConfig() (server.ServerConfig, error) {
 	c_config.DB_mergers_queue_size = v.GetUint("queues.database.mergers")
 	c_config.Con_worker_queue_size = v.GetUint("queues.connection")
 	c_config.Dispatcher_queue_size = v.GetUint("queues.dispatcher")
+	c_config.Alarm_manager_queue_size = v.GetUint("queues.alarm-manager")
 	c_config.DB_epoch_duration = v.GetDuration("database.epoch-duration")
 	c_config.DB_files_path = v.GetString("database.files-path")
+	c_config.Alarm_period = v.GetDuration("alarm.period")
+	c_config.Alarm_config_file = v.GetString("alarm.config-path")
 
 	return c_config, nil
 
@@ -122,9 +129,13 @@ func PrintConfig(config *server.ServerConfig) {
 	log.Infof(" - Database mergers: %v", config.DB_mergers_queue_size)
 	log.Infof(" - Connections: %v", config.Con_worker_queue_size)
 	log.Infof(" - Dispatcher: %v", config.Dispatcher_queue_size)
+	log.Infof(" - AlarmManager: %v", config.Alarm_manager_queue_size)
 	log.Infof("Database:")
 	log.Infof(" - Epoch duration: %v", config.DB_epoch_duration)
 	log.Infof(" - Files path: %v", config.DB_files_path)
+	log.Infof("Alarm:")
+	log.Infof(" - Period: %v", config.Alarm_period)
+	log.Infof(" - Config file path: %v", config.Alarm_config_file)
 }
 
 func main() {
@@ -143,7 +154,7 @@ func main() {
 
 	server, err := server.Start(config)
 	if err != nil {
-		log.Fatal("Error starting server. %v", err)
+		log.Fatalf("Error starting server. %v", err)
 		return
 	}
 	exit := make(chan os.Signal, 1)

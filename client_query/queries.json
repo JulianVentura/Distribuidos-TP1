@@ -1,0 +1,53 @@
+[
+    {
+        "metric_id": "TEST_QUERY_1",
+        "from": "2022-04-27T22:12:25.012Z",
+        "to": "2022-04-27T22:12:34.022Z",
+        "aggregation": "COUNT",
+        "aggregation_window_secs": 10
+    },
+    {
+        "metric_id": "TEST_QUERY_1",
+        "from": "2022-04-27T22:12:25.012Z",
+        "to": "2022-04-27T22:12:34.022Z",
+        "aggregation": "MAX",
+        "aggregation_window_secs": 10
+    },
+    {
+        "metric_id": "TEST_QUERY_1",
+        "from": "2022-04-27T22:12:25.012Z",
+        "to": "2022-04-27T22:12:34.022Z",
+        "aggregation": "MIN",
+        "aggregation_window_secs": 10
+    },
+    {
+        "metric_id": "TEST_QUERY_1",
+        "from": "2022-04-27T22:12:25.012Z",
+        "to": "2022-04-27T22:12:34.022Z",
+        "aggregation": "AVG",
+        "aggregation_window_secs": 10
+    },
+    {
+        "metric_id": "CLI_METRIC_1",
+        "from": "2022-04-28T05:35:00.000Z",
+        "to": "2022-04-28T05:35:00.010Z",
+        "aggregation": "COUNT",
+        "aggregation_window_secs": 0
+    },
+    {
+        "metric_id": "METRIC_WHICH_DO_NOT_EXISTS",
+        "from": "2022-04-28T05:35:00.000Z",
+        "to": "2022-04-28T05:35:00.010Z",
+        "aggregation": "COUNT",
+        "aggregation_window_secs": 0
+    },
+    {
+        "metric_id": "METRIC_WITH_WRONG_FORMAT",
+        "from": 4,
+        "to": "2022-04-28T05:35:00.010Z",
+        "aggregation": "COUNT",
+        "aggregation_window_secs": 0
+    }
+
+
+]

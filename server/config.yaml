@@ -7,18 +7,22 @@ log:
   level: 'debug'
 workers:
   database:
-    writers: 3
-    readers: 1
-    mergers: 3
-  connection: 10
+    writers: 4
+    readers: 4
+    mergers: 4
+  connection: 1
 queues:
   database:
-    readers: 8
+    readers: 64
     writers: 256
     merger-admin: 256
     mergers: 256
+  alarm-manager: 64
   connection: 64
   dispatcher: 256
 database:
-  epoch-duration: 0.5s
+  epoch-duration: 2s
   files-path: ./files
+alarm:
+  period: 60s
+  config-path: ./alarms.json

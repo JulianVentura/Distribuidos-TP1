@@ -9,6 +9,9 @@ services:
         source: ./server/config.yaml
         target: /config.yaml
       - type: bind 
+        source: ./server/alarms.json
+        target: /alarms.json
+      - type: bind 
         source: ./server/files
         target: /files
     networks:

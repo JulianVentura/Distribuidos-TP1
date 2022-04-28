@@ -90,7 +90,7 @@ func parse_server_response(response protocol.Encodable) bool {
 
 	switch t := response.(type) {
 	case *protocol.Ok:
-		fmt.Println("Ok")
+		fmt.Println("Metric has been received")
 	case *protocol.Error:
 		fmt.Printf("ERROR: %v\n", t.Message)
 	case *protocol.Finish:

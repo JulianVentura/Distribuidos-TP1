@@ -42,11 +42,39 @@ func encode8(number uint8) []byte {
 	return buffer
 }
 
-func encodeString(str string) []byte {
+func encode_string(str string) []byte {
 	encoded_size := encode32(uint32(len(str)))
 	//UTF-8 Encoding
 	encoded_str := []byte(str)
 	return append(encoded_size, encoded_str...)
+}
+
+func encode_F64slice(slice []float64) []byte {
+	float_size := 8
+	l := len(slice)
+	buffer := make([]byte, l*float_size) //Buffer for encoded slice
+	len := encode32(uint32(l))
+
+	for i := 0; i < l; i++ {
+		slc_idx := float_size * i
+		binary.BigEndian.PutUint64(buffer[slc_idx:], math.Float64bits(slice[i]))
+	}
+
+	return append(len, buffer...)
+}
+
+func decode_F64slice(encoded []byte) ([]float64, uint32) {
+	float_size := uint32(8)
+	len, start := decode32(encoded)
+	slice := make([]float64, len)
+
+	for i := uint32(0); i < len; i++ {
+		slc_idx := float_size*i + start
+		decoded := binary.BigEndian.Uint64(encoded[slc_idx:])
+		slice[i] = math.Float64frombits(decoded)
+	}
+
+	return slice, len*float_size + start
 }
 
 func decodeF64(encoded []byte) (float64, uint32) {
@@ -71,7 +99,7 @@ func decode8(encoded []byte) (uint8, uint32) {
 	return uint8(encoded[0]), 1
 }
 
-func decodeString(encoded []byte) (string, uint32) {
+func decode_string(encoded []byte) (string, uint32) {
 
 	str_len, n := decode32(encoded)
 	str := string(encoded[n : str_len+n])
@@ -90,8 +118,6 @@ func Send(socket *socket.TCPConnection, message Encodable) error {
 
 func Receive_with_timeout(socket *socket.TCPConnection, t time.Duration) (Encodable, error) {
 	buffer := make([]byte, 4)
-	//TODO: Ver si vale la pena ajustar el tiempo demorado entre el primer llamado y el segundo, porque en el peor de los casos se
-	// espera 2xt
 	err := socket.Receive_with_timeout(buffer, t)
 	if err != nil {
 		return nil, err

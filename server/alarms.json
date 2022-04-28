@@ -1,0 +1,23 @@
+[
+    {
+        "id": "ALARM_1",
+        "metric_id": "CLI_METRIC_1",
+        "aggregation": "COUNT",
+        "aggregation_window_secs": 60,
+        "limit": 800
+    },
+    {
+        "id": "ALARM_2",
+        "metric_id": "CLI_METRIC_1",
+        "aggregation": "COUNT",
+        "aggregation_window_secs": 15.0,
+        "limit": 75
+    },
+    {
+        "id": "ALARM_3",
+        "metric_id": "CLI_METRIC_1",
+        "aggregation": "COUNT",
+        "aggregation_window_secs": 1.0,
+        "limit": 20
+    }
+]

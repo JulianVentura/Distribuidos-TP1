@@ -9,9 +9,6 @@ type ServerSocket struct {
 	skt net.Listener
 }
 
-// TODO:
-// 	- Agregar configuraciones al momento de levantar el socket, una posible estructura como en el TP0
-
 func NewServer(address string) (ServerSocket, error) {
 	listener, err := net.Listen("tcp", address)
 	if err != nil {

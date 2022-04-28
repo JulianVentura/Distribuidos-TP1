@@ -2,7 +2,8 @@ package messages
 
 import (
 	"distribuidos/tp1/common/socket"
-	"distribuidos/tp1/server/src/models"
+	bs "distribuidos/tp1/server/src/business"
+	"sync"
 )
 
 type DispatcherMessage interface {
@@ -29,6 +30,10 @@ type MergersMessage interface {
 	implementsMergersMessage()
 }
 
+type AlarmManagerMessage interface {
+	implementsAlarmManagerMessage()
+}
+
 type NewConnection struct {
 	Skt *socket.TCPConnection
 }
@@ -39,17 +44,20 @@ type ConnectionFinished struct {
 
 type QueryResponse struct {
 	Conn_worker_id uint
-	Response       string //Change
+	Query          bs.Query
+	Response       []*bs.Metric
+	Is_error       bool
+	Error_message  string
 }
 
 type NewMetric struct {
 	Conn_worker_id uint
-	Metric         models.Metric
+	Metric         bs.Metric
 }
 
 type NewQuery struct {
 	Conn_worker_id uint
-	Query          models.Query
+	Query          bs.Query
 }
 
 type EpochEnd struct {
@@ -77,6 +85,7 @@ type Append struct {
 	Metric_id      string
 	File_to_append string
 	DB_file        string
+	DB_file_lock   *sync.RWMutex
 }
 
 func (NewConnection) implementsDispatcherMessage()       {}
@@ -86,6 +95,7 @@ func (ConnectionFinished) implementsDispatcherMessage() {}
 
 func (QueryResponse) implementsDispatcherMessage()       {}
 func (QueryResponse) implementsConnectionWorkerMessage() {}
+func (QueryResponse) implementsAlarmManagerMessage()     {}
 
 func (NewMetric) implementsWriteDatabaseMessage() {}
 func (NewMetric) implementsReadDatabaseMessage()  {}
@@ -96,3 +106,5 @@ func (AppendFinished) implementsMergerAdminMessage() {}
 
 func (Merge) implementsMergersMessage()  {}
 func (Append) implementsMergersMessage() {}
+
+func (NewQuery) implementsReadDatabaseMessage() {}

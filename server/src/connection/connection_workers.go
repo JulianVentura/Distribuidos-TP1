@@ -1,16 +1,16 @@
 package connection
 
 import (
+	Err "distribuidos/tp1/common/errors"
 	"distribuidos/tp1/common/protocol"
 	"distribuidos/tp1/common/socket"
+	bs "distribuidos/tp1/server/src/business"
 	"distribuidos/tp1/server/src/messages"
-	"distribuidos/tp1/server/src/models"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 )
 
-//TODO: Change
 type ConnectionWorker struct {
 	id           uint
 	queue        chan messages.ConnectionWorkerMessage
@@ -27,7 +27,6 @@ type ConnectionWorkerConfig struct {
 	Id                 uint
 }
 
-//TODO: Ver como indicarle la cola del dispatcher para que pueda notificar fin de conexion
 func StartConnectionWorker(
 	config ConnectionWorkerConfig,
 	queue chan messages.ConnectionWorkerMessage,
@@ -85,12 +84,13 @@ Loop:
 	for {
 		select {
 		case <-self.quit:
-			self.quit <- true // De esta forma propagamos la señal
+			self.quit <- true // We do this in order to propagate the signal
 			break Loop
 		default:
 			message, err := protocol.Receive_with_timeout(client, self.conn_timeout)
 			if err != nil {
 				//Wichever the error is, we want to close the connection
+				log.Debugf("Closing client connection because of error %v", err)
 				send_finish(client)
 				break Loop
 			}
@@ -106,41 +106,79 @@ Loop:
 	}
 
 	_ = client.Close()
-	self.dispatcher <- messages.ConnectionFinished{
+	self.dispatcher <- &messages.ConnectionFinished{
 		Conn_worker_id: self.id,
 	}
 
-	log.Debug("Client connection finished")
+	log.Info("Client connection finished")
 }
 
 func (self *ConnectionWorker) handle_new_metric(m *protocol.Metric, client *socket.TCPConnection) {
-	//Instanciar métrica a nivel business
-	metric, err := models.NewMetric(m.Id, m.Value)
+	//Validate metric data with business rules
+	metric, err := bs.NewMetric(m.Id, m.Value)
 	if err != nil {
 		send_error(client, "Bad formating")
 		return
 	}
-	//Encolar en la cola de writers de bdd
+	//Send the new metric to the Database
 	self.event_queue <- &messages.NewMetric{
 		Conn_worker_id: self.id,
 		Metric:         metric,
 	}
-	//Enviar mensaje OK al cliente
+	//Send confirmation message to client
 	send_ok(client)
 }
 
 func (self *ConnectionWorker) handle_query(q *protocol.Query, client *socket.TCPConnection) {
-	//Instanciar query a nivel business
-	_, err := models.NewQuery(q.Metric_id, q.From, q.To, q.Aggregation, q.AggregationWindowSecs)
+	//Data parsing
+	from, err1 := parse_time(q.From)
+	to, err2 := parse_time(q.To)
+	if err1 != nil || err2 != nil {
+		send_error(client, "Bad formating")
+		return
+	}
+	//Validate query data with business rules
+	query, err := bs.NewQuery("", q.Metric_id, from, to, q.Aggregation, q.AggregationWindowSecs)
 	if err != nil {
 		send_error(client, "Bad formating")
 		return
 	}
-	//Encolar en la cola de readers de bdd
-	// fmt.Printf(" - Query: (%v, %v, %v, %v, %v)\n", query.Metric_id, query.From, query.To, query.Aggregation, query.AggregationWindowSecs)
-	//Esperar por la respuesta desde self.queue
-	//Enviar mensaje QueryResponse al cliente
-	send_ok(client) //Change
+	//Send the query to the Database
+	self.query_queue <- &messages.NewQuery{
+		Conn_worker_id: self.id,
+		Query:          query,
+	}
+
+	//Wait for the Database response
+	var response *messages.QueryResponse
+
+Loop:
+	for {
+		message := <-self.queue
+		switch m := message.(type) {
+		case *messages.QueryResponse:
+			response = m
+			break Loop
+		default:
+			log.Errorf("An unexpected message was received by ConnectionWorker, waiting for a QueryResponse %v", m)
+		}
+	}
+
+	//Check if there was an error
+	if response.Is_error {
+		send_error(client, response.Error_message)
+		return
+	}
+
+	//Aggregate the database result
+	result, err := bs.Aggregate(&response.Query, response.Response)
+	if err != nil {
+		log.Errorf("ConnectionWorker: Error aggregating query response: %v", err)
+		return
+	}
+
+	//Send the aggregated result to the client
+	send_query_response(client, result)
 }
 
 func send_error(client *socket.TCPConnection, message string) error {
@@ -153,4 +191,19 @@ func send_finish(client *socket.TCPConnection) {
 
 func send_ok(client *socket.TCPConnection) {
 	_ = protocol.Send(client, &protocol.Ok{})
+}
+
+func send_query_response(client *socket.TCPConnection, data []float64) error {
+	return protocol.Send(client, &protocol.QueryResponse{Data: data})
+}
+
+func parse_time(t string) (time.Time, error) {
+	//Our precission will be to milliseconds order
+	layout := "2006-01-02T15:04:05.000Z" // Weird Golang's time parse layout
+	parsed, err := time.Parse(layout, t)
+
+	if err != nil {
+		return time.Time{}, Err.Ctx("Couldn't parse time object", err)
+	}
+	return parsed, nil
 }

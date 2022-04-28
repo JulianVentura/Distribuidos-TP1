@@ -47,6 +47,10 @@ type Finish struct { //Implements Encodable
 	Message string
 }
 
+type QueryResponse struct { //Implements Encodable
+	Data []float64
+}
+
 type Ok struct { //Implements Encodable
 }
 
@@ -86,34 +90,32 @@ func decodeAggregation(bytes []byte) (string, uint32, error) {
 	case COUNT:
 		agg = "COUNT"
 	default:
-		//Now we will return an error
-		return "", 0, fmt.Errorf("Error decoding aggregation function of Query message on Protocol, code %v not recognized", code)
+		agg = "UNKNOWN" //We leave the error to the upper layer
 	}
 
 	return agg, n, nil
 }
 func (self *Query) encode() []byte {
 	message_id := encode8(QueryOP)
-	metric_id := encodeString(self.Metric_id)
-	from := encodeString(self.From)
-	to := encodeString(self.To)
+	metric_id := encode_string(self.Metric_id)
+	from := encode_string(self.From)
+	to := encode_string(self.To)
 	aggregation := encodeAggregation(self.Aggregation)
 	agg_window := encodeF64(self.AggregationWindowSecs)
 
 	return append_slices([][]byte{message_id, metric_id, from, to, aggregation, agg_window})
 }
 
-//TODO: Que pasa si la data llega corrupta? Panic?
 func (self *Query) fromEncoding(code []byte) error {
 	_, start := decode8(code)
 
-	metric_id, n := decodeString(code[start:])
+	metric_id, n := decode_string(code[start:])
 	start += n
 
-	from, n := decodeString(code[start:])
+	from, n := decode_string(code[start:])
 	start += n
 
-	to, n := decodeString(code[start:])
+	to, n := decode_string(code[start:])
 	start += n
 
 	aggregation, n, err := decodeAggregation(code[start:])
@@ -134,10 +136,9 @@ func (self *Query) fromEncoding(code []byte) error {
 	return nil
 }
 
-//TODO: Improve performance
 func (self *Metric) encode() []byte {
 	message_id := encode8(MetricOP)
-	metric_id := encodeString(self.Id)
+	metric_id := encode_string(self.Id)
 	value := encodeF64(self.Value)
 
 	return append_slices([][]byte{message_id, metric_id, value})
@@ -147,7 +148,7 @@ func (self *Metric) fromEncoding(code []byte) error {
 
 	_, start := decode8(code)
 
-	id, n := decodeString(code[start:])
+	id, n := decode_string(code[start:])
 	start += n
 
 	value, n := decodeF64(code[start:])
@@ -161,7 +162,7 @@ func (self *Metric) fromEncoding(code []byte) error {
 
 func (self *Error) encode() []byte {
 	message_id := encode8(ErrorOP)
-	message := encodeString(self.Message)
+	message := encode_string(self.Message)
 	return append(message_id, message...)
 }
 
@@ -169,7 +170,7 @@ func (self *Error) fromEncoding(code []byte) error {
 
 	_, start := decode8(code)
 
-	message, _ := decodeString(code[start:])
+	message, _ := decode_string(code[start:])
 
 	self.Message = message
 
@@ -178,14 +179,14 @@ func (self *Error) fromEncoding(code []byte) error {
 
 func (self *Finish) encode() []byte {
 	message_id := encode8(FinishOP)
-	message := encodeString(self.Message)
+	message := encode_string(self.Message)
 	return append(message_id, message...)
 }
 
 func (self *Finish) fromEncoding(code []byte) error {
 	_, start := decode8(code)
 
-	message, _ := decodeString(code[start:])
+	message, _ := decode_string(code[start:])
 
 	self.Message = message
 
@@ -200,7 +201,23 @@ func (self *Ok) fromEncoding(code []byte) error {
 	return nil
 }
 
-//TODO: Change to private
+func (self *QueryResponse) encode() []byte {
+
+	message_id := encode8(QueryResponseOP)
+	data := encode_F64slice(self.Data)
+
+	return append(message_id, data...)
+}
+
+func (self *QueryResponse) fromEncoding(code []byte) error {
+	_, start := decode8(code)
+	slice, _ := decode_F64slice(code[start:])
+
+	self.Data = slice
+
+	return nil
+}
+
 func Encode(message Encodable) []byte {
 	return message.encode()
 }
@@ -224,8 +241,10 @@ func Decode(code []byte) (Encodable, error) {
 		msg = &Finish{}
 	case OkOP:
 		msg = &Ok{}
+	case QueryResponseOP:
+		msg = &QueryResponse{}
 	default:
-		return nil, fmt.Errorf("Error al decodificar el mensaje\n")
+		return nil, fmt.Errorf("Unknown received message\n")
 	}
 
 	err = msg.fromEncoding(code) //Including message_id

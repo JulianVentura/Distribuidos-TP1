@@ -31,7 +31,12 @@ docker-server-image:
 
 docker-client-app-image:
 	docker build -f ./client_app/Dockerfile -t "client_app:latest" .
-.PHONY: docker-server-image
+.PHONY: docker-client-app-image
+
+docker-client-query-image:
+	docker build -f ./client_query/Dockerfile -t "client_query:latest" .
+.PHONY: docker-client-query-image
+
 
 server-up: docker-server-image
 	docker-compose -f docker-compose-server.yaml up --build
@@ -39,7 +44,11 @@ server-up: docker-server-image
 
 client-app-up: docker-client-app-image
 	docker-compose -f docker-compose-clients.yaml up --build
-.PHONY: server-up
+.PHONY: client-app-up
+
+client-query-up: docker-client-query-image
+	docker-compose -f docker-compose-client-query.yaml up --build
+.PHONY: client-query-up
 
 server-down:
 	docker-compose -f docker-compose-server.yaml stop -t 10
@@ -50,6 +59,11 @@ client-app-down:
 	docker-compose -f docker-compose-clients.yaml stop -t 10
 	docker-compose -f docker-compose-clients.yaml down
 .PHONY: client-app-down
+
+client-query-down:
+	docker-compose -f docker-compose-client-query.yaml stop -t 10
+	docker-compose -f docker-compose-client-query.yaml down
+.PHONY: client-query-down
 
 server-logs:
 	docker-compose -f docker-compose-server.yaml logs -f

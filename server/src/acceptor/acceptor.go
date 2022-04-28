@@ -55,10 +55,9 @@ func (self *Acceptor) run() {
 				log.Infof("Acceptor Worker has finished")
 				break
 			}
-			log.Fatal("Accept has failed") // TODO: Ver como informar de un error fatal al servidor, para su finalizacion
 		}
 
-		self.dispatcher <- messages.NewConnection{Skt: &conn}
+		self.dispatcher <- &messages.NewConnection{Skt: &conn}
 	}
 	_ = self.skt.Close()
 	self.has_finished <- true

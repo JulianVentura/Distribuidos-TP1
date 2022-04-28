@@ -2,7 +2,8 @@
 server:
   address: "server:12345"
 loop:
-  number: "1000"
   period: "25ms"
 log:
   level: "info"
+queries:
+  file-path: ./queries.json
